@@ -1,0 +1,378 @@
+import sql from './index';
+import {
+  User,
+  Project,
+  Column,
+  Task,
+  Tag,
+  TaskWithTags,
+  ColumnWithTasks,
+  ActivityLog,
+} from '@/types';
+
+// ==================== USER QUERIES ====================
+export async function getUserByEmail(email: string): Promise<User | null> {
+  const users = await sql<User[]>`
+    SELECT * FROM users WHERE email = ${email} LIMIT 1
+  `;
+  return users[0] || null;
+}
+
+export async function getUserById(id: number): Promise<User | null> {
+  const users = await sql<User[]>`
+    SELECT * FROM users WHERE id = ${id} LIMIT 1
+  `;
+  return users[0] || null;
+}
+
+export async function createUser(email: string, passwordHash: string, name: string): Promise<User> {
+  const users = await sql<User[]>`
+    INSERT INTO users (email, password_hash, name)
+    VALUES (${email}, ${passwordHash}, ${name})
+    RETURNING *
+  `;
+  return users[0];
+}
+
+// ==================== PROJECT QUERIES ====================
+export async function getProjectsByUserId(userId: number): Promise<Project[]> {
+  return await sql<Project[]>`
+    SELECT * FROM projects 
+    WHERE user_id = ${userId} 
+    ORDER BY updated_at DESC
+  `;
+}
+
+export async function getProjectById(id: number, userId: number): Promise<Project | null> {
+  const projects = await sql<Project[]>`
+    SELECT * FROM projects 
+    WHERE id = ${id} AND user_id = ${userId}
+    LIMIT 1
+  `;
+  return projects[0] || null;
+}
+
+export async function createProject(
+  userId: number,
+  title: string,
+  description: string | null,
+  color: string
+): Promise<Project> {
+  const projects = await sql<Project[]>`
+    INSERT INTO projects (user_id, title, description, color)
+    VALUES (${userId}, ${title}, ${description}, ${color})
+    RETURNING *
+  `;
+  return projects[0];
+}
+
+export async function updateProject(
+  id: number,
+  userId: number,
+  data: { title?: string; description?: string | null; color?: string }
+): Promise<Project | null> {
+  const updates: string[] = [];
+  const values: any[] = [];
+
+  if (data.title !== undefined) {
+    updates.push(`title = $${updates.length + 1}`);
+    values.push(data.title);
+  }
+  if (data.description !== undefined) {
+    updates.push(`description = $${updates.length + 1}`);
+    values.push(data.description);
+  }
+  if (data.color !== undefined) {
+    updates.push(`color = $${updates.length + 1}`);
+    values.push(data.color);
+  }
+
+  if (updates.length === 0) {
+    return await getProjectById(id, userId);
+  }
+
+  updates.push('updated_at = CURRENT_TIMESTAMP');
+
+  const projects = await sql<Project[]>`
+    UPDATE projects 
+    SET ${sql(updates.join(', '))}
+    WHERE id = ${id} AND user_id = ${userId}
+    RETURNING *
+  `;
+  return projects[0] || null;
+}
+
+export async function deleteProject(id: number, userId: number): Promise<boolean> {
+  const result = await sql`
+    DELETE FROM projects 
+    WHERE id = ${id} AND user_id = ${userId}
+  `;
+  return result.count > 0;
+}
+
+// ==================== COLUMN QUERIES ====================
+export async function getColumnsByProjectId(projectId: number): Promise<Column[]> {
+  return await sql<Column[]>`
+    SELECT * FROM columns 
+    WHERE project_id = ${projectId} 
+    ORDER BY position ASC
+  `;
+}
+
+export async function createColumn(
+  projectId: number,
+  title: string,
+  position: number,
+  color: string,
+  taskLimit: number | null,
+  columnType: string
+): Promise<Column> {
+  const columns = await sql<Column[]>`
+    INSERT INTO columns (project_id, title, position, color, task_limit, column_type)
+    VALUES (${projectId}, ${title}, ${position}, ${color}, ${taskLimit}, ${columnType})
+    RETURNING *
+  `;
+  return columns[0];
+}
+
+export async function updateColumn(
+  id: number,
+  data: { title?: string; position?: number; color?: string; task_limit?: number | null; column_type?: string }
+): Promise<Column | null> {
+  const setClauses: string[] = [];
+  
+  if (data.title !== undefined) setClauses.push(sql`title = ${data.title}`);
+  if (data.position !== undefined) setClauses.push(sql`position = ${data.position}`);
+  if (data.color !== undefined) setClauses.push(sql`color = ${data.color}`);
+  if (data.task_limit !== undefined) setClauses.push(sql`task_limit = ${data.task_limit}`);
+  if (data.column_type !== undefined) setClauses.push(sql`column_type = ${data.column_type}`);
+
+  if (setClauses.length === 0) return null;
+
+  const columns = await sql<Column[]>`
+    UPDATE columns 
+    SET ${sql.join(setClauses, sql`, `)}
+    WHERE id = ${id}
+    RETURNING *
+  `;
+  return columns[0] || null;
+}
+
+export async function deleteColumn(id: number): Promise<boolean> {
+  const result = await sql`
+    DELETE FROM columns WHERE id = ${id}
+  `;
+  return result.count > 0;
+}
+
+export async function reorderColumns(updates: { id: number; position: number }[]): Promise<void> {
+  for (const update of updates) {
+    await sql`
+      UPDATE columns 
+      SET position = ${update.position}
+      WHERE id = ${update.id}
+    `;
+  }
+}
+
+// ==================== TASK QUERIES ====================
+export async function getTasksByProjectId(projectId: number): Promise<Task[]> {
+  return await sql<Task[]>`
+    SELECT * FROM tasks 
+    WHERE project_id = ${projectId} AND is_archived = false
+    ORDER BY position ASC
+  `;
+}
+
+export async function getTaskById(id: number): Promise<Task | null> {
+  const tasks = await sql<Task[]>`
+    SELECT * FROM tasks WHERE id = ${id} LIMIT 1
+  `;
+  return tasks[0] || null;
+}
+
+export async function createTask(
+  projectId: number,
+  columnId: number | null,
+  title: string,
+  description: string | null,
+  priority: string,
+  dueDate: Date | null,
+  energyLevel: string | null,
+  position: number
+): Promise<Task> {
+  const tasks = await sql<Task[]>`
+    INSERT INTO tasks (
+      project_id, column_id, title, description, priority, 
+      due_date, energy_level, position
+    )
+    VALUES (
+      ${projectId}, ${columnId}, ${title}, ${description}, ${priority},
+      ${dueDate}, ${energyLevel}, ${position}
+    )
+    RETURNING *
+  `;
+  return tasks[0];
+}
+
+export async function updateTask(
+  id: number,
+  data: {
+    title?: string;
+    description?: string | null;
+    priority?: string;
+    due_date?: Date | null;
+    energy_level?: string | null;
+    column_id?: number | null;
+    position?: number;
+    time_spent?: number;
+    is_archived?: boolean;
+    completed_at?: Date | null;
+  }
+): Promise<Task | null> {
+  const setClauses: any[] = [];
+  
+  if (data.title !== undefined) setClauses.push(sql`title = ${data.title}`);
+  if (data.description !== undefined) setClauses.push(sql`description = ${data.description}`);
+  if (data.priority !== undefined) setClauses.push(sql`priority = ${data.priority}`);
+  if (data.due_date !== undefined) setClauses.push(sql`due_date = ${data.due_date}`);
+  if (data.energy_level !== undefined) setClauses.push(sql`energy_level = ${data.energy_level}`);
+  if (data.column_id !== undefined) setClauses.push(sql`column_id = ${data.column_id}`);
+  if (data.position !== undefined) setClauses.push(sql`position = ${data.position}`);
+  if (data.time_spent !== undefined) setClauses.push(sql`time_spent = ${data.time_spent}`);
+  if (data.is_archived !== undefined) setClauses.push(sql`is_archived = ${data.is_archived}`);
+  if (data.completed_at !== undefined) setClauses.push(sql`completed_at = ${data.completed_at}`);
+
+  setClauses.push(sql`updated_at = CURRENT_TIMESTAMP`);
+
+  if (setClauses.length === 0) return null;
+
+  const tasks = await sql<Task[]>`
+    UPDATE tasks 
+    SET ${sql.join(setClauses, sql`, `)}
+    WHERE id = ${id}
+    RETURNING *
+  `;
+  return tasks[0] || null;
+}
+
+export async function deleteTask(id: number): Promise<boolean> {
+  const result = await sql`
+    DELETE FROM tasks WHERE id = ${id}
+  `;
+  return result.count > 0;
+}
+
+export async function moveTask(
+  taskId: number,
+  columnId: number | null,
+  position: number
+): Promise<Task | null> {
+  const tasks = await sql<Task[]>`
+    UPDATE tasks 
+    SET column_id = ${columnId}, position = ${position}, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ${taskId}
+    RETURNING *
+  `;
+  return tasks[0] || null;
+}
+
+export async function reorderTasks(updates: { id: number; position: number }[]): Promise<void> {
+  for (const update of updates) {
+    await sql`
+      UPDATE tasks 
+      SET position = ${update.position}
+      WHERE id = ${update.id}
+    `;
+  }
+}
+
+// ==================== TAG QUERIES ====================
+export async function getTagsByUserId(userId: number): Promise<Tag[]> {
+  return await sql<Tag[]>`
+    SELECT * FROM tags WHERE user_id = ${userId} ORDER BY name ASC
+  `;
+}
+
+export async function createTag(userId: number, name: string, color: string): Promise<Tag> {
+  const tags = await sql<Tag[]>`
+    INSERT INTO tags (user_id, name, color)
+    VALUES (${userId}, ${name}, ${color})
+    ON CONFLICT (user_id, name) DO UPDATE SET color = ${color}
+    RETURNING *
+  `;
+  return tags[0];
+}
+
+export async function getTagsByTaskId(taskId: number): Promise<Tag[]> {
+  return await sql<Tag[]>`
+    SELECT t.* FROM tags t
+    INNER JOIN task_tags tt ON t.id = tt.tag_id
+    WHERE tt.task_id = ${taskId}
+  `;
+}
+
+export async function addTagToTask(taskId: number, tagId: number): Promise<void> {
+  await sql`
+    INSERT INTO task_tags (task_id, tag_id)
+    VALUES (${taskId}, ${tagId})
+    ON CONFLICT (task_id, tag_id) DO NOTHING
+  `;
+}
+
+export async function removeTagFromTask(taskId: number, tagId: number): Promise<void> {
+  await sql`
+    DELETE FROM task_tags 
+    WHERE task_id = ${taskId} AND tag_id = ${tagId}
+  `;
+}
+
+// ==================== ACTIVITY LOG QUERIES ====================
+export async function createActivityLog(
+  taskId: number,
+  userId: number,
+  action: string,
+  fromColumnId: number | null,
+  toColumnId: number | null,
+  duration: number | null
+): Promise<ActivityLog> {
+  const logs = await sql<ActivityLog[]>`
+    INSERT INTO activity_logs (task_id, user_id, action, from_column_id, to_column_id, duration)
+    VALUES (${taskId}, ${userId}, ${action}, ${fromColumnId}, ${toColumnId}, ${duration})
+    RETURNING *
+  `;
+  return logs[0];
+}
+
+export async function getActivityLogsByTaskId(taskId: number): Promise<ActivityLog[]> {
+  return await sql<ActivityLog[]>`
+    SELECT * FROM activity_logs 
+    WHERE task_id = ${taskId}
+    ORDER BY created_at DESC
+    LIMIT 50
+  `;
+}
+
+// ==================== COMPOSITE QUERIES ====================
+export async function getTasksWithTags(projectId: number): Promise<TaskWithTags[]> {
+  const tasks = await getTasksByProjectId(projectId);
+  
+  const tasksWithTags: TaskWithTags[] = await Promise.all(
+    tasks.map(async (task) => {
+      const tags = await getTagsByTaskId(task.id);
+      return { ...task, tags };
+    })
+  );
+
+  return tasksWithTags;
+}
+
+export async function getColumnsWithTasks(projectId: number): Promise<ColumnWithTasks[]> {
+  const columns = await getColumnsByProjectId(projectId);
+  const tasks = await getTasksWithTags(projectId);
+
+  return columns.map((column) => ({
+    ...column,
+    tasks: tasks.filter((task) => task.column_id === column.id),
+  }));
+}
