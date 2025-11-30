@@ -1,12 +1,38 @@
+require('dotenv').config(); // Tambahkan ini di baris pertama
+
 const postgres = require('postgres');
 const fs = require('fs');
 const path = require('path');
 
 async function setupDatabase() {
-  const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/kanban_db';
+  const connectionString = process.env.DATABASE_URL;
   
+  if (!connectionString) {
+    console.error('❌ DATABASE_URL is not set in .env file');
+    console.error('Current DATABASE_URL:', connectionString);
+    process.exit(1);
+  }
+
   console.log('Connecting to database...');
-  const sql = postgres(connectionString);
+  
+  // Setup SSL if certificate path is provided
+  let ssl = undefined;
+  
+  if (process.env.DATABASE_SSL_CERT_PATH) {
+    const certPath = path.resolve(process.env.DATABASE_SSL_CERT_PATH);
+    
+    if (fs.existsSync(certPath)) {
+      ssl = {
+        rejectUnauthorized: true,
+        ca: fs.readFileSync(certPath).toString(),
+      };
+      console.log('✅ SSL certificate loaded from:', certPath);
+    } else {
+      console.warn('⚠️  SSL certificate not found at:', certPath);
+    }
+  }
+  
+  const sql = postgres(connectionString, { ssl });
 
   try {
     console.log('Reading schema file...');

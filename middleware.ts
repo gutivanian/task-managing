@@ -22,3 +22,6 @@ export default auth((req) => {
 export const config = {
   matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
 };
+
+// Tambahkan ini untuk menggunakan Node.js runtime
+export const runtime = 'nodejs';

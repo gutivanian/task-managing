@@ -59,6 +59,8 @@ export const authConfig: NextAuthConfig = {
     strategy: 'jwt',
   },
   secret: process.env.NEXTAUTH_SECRET,
+  // trustHost akan auto-detect URL di Vercel
+  trustHost: true,
 };
 
 export const { handlers, auth, signIn, signOut } = NextAuth(authConfig);
