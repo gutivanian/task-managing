@@ -67,8 +67,22 @@ export interface ActivityLog {
   created_at: Date;
 }
 
+// Tambahkan interface baru setelah interface Tag (sekitar baris 52)
+
+export interface Subtask {
+  id: number;
+  task_id: number;
+  title: string;
+  is_completed: boolean;
+  position: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+// Update interface TaskWithTags (sekitar baris 70)
 export interface TaskWithTags extends Task {
   tags: Tag[];
+  subtasks?: Subtask[]; // tambahkan ini
 }
 
 export interface ColumnWithTasks extends Column {

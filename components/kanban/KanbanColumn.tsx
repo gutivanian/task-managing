@@ -26,25 +26,25 @@ export default function KanbanColumn({
   const taskIds = column.tasks.map((task) => task.id);
 
   return (
-    <div className="flex flex-col bg-gray-50 rounded-lg p-3 min-w-[280px] max-w-[320px]">
+    <div className="flex flex-col bg-gray-50 dark:bg-gray-800 rounded-lg p-3 min-w-[280px] max-w-[320px]">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <div
             className="w-3 h-3 rounded-full"
             style={{ backgroundColor: column.color }}
           />
-          <h3 className="font-semibold text-gray-900">{column.title}</h3>
-          <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">
+          <h3 className="font-semibold text-gray-900 dark:text-gray-100">{column.title}</h3>
+          <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded-full">
             {column.tasks.length}
             {column.task_limit && `/${column.task_limit}`}
           </span>
         </div>
         <button
           onClick={() => onAddTask(column.id)}
-          className="p-1 hover:bg-gray-200 rounded transition-colors"
+          className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
           title="Add task"
         >
-          <Plus className="w-4 h-4 text-gray-600" />
+          <Plus className="w-4 h-4 text-gray-600 dark:text-gray-400" />
         </button>
       </div>
 
@@ -64,7 +64,7 @@ export default function KanbanColumn({
         </SortableContext>
 
         {column.tasks.length === 0 && (
-          <div className="flex items-center justify-center h-32 text-gray-400 text-sm">
+          <div className="flex items-center justify-center h-32 text-gray-400 dark:text-gray-500 text-sm">
             No tasks yet
           </div>
         )}

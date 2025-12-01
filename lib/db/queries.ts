@@ -8,6 +8,7 @@ import {
   TaskWithTags,
   ColumnWithTasks,
   ActivityLog,
+  Subtask,
 } from '@/types';
 
 // ==================== USER QUERIES ====================
@@ -360,13 +361,13 @@ export async function getTasksWithTags(projectId: number): Promise<TaskWithTags[
   const tasksWithTags: TaskWithTags[] = await Promise.all(
     tasks.map(async (task) => {
       const tags = await getTagsByTaskId(task.id);
-      return { ...task, tags };
+      const subtasks = await getSubtasksByTaskId(task.id);
+      return { ...task, tags, subtasks };
     })
   );
 
   return tasksWithTags;
 }
-
 export async function getColumnsWithTasks(projectId: number): Promise<ColumnWithTasks[]> {
   const columns = await getColumnsByProjectId(projectId);
   const tasks = await getTasksWithTags(projectId);
@@ -375,4 +376,57 @@ export async function getColumnsWithTasks(projectId: number): Promise<ColumnWith
     ...column,
     tasks: tasks.filter((task) => task.column_id === column.id),
   }));
+}
+
+
+// ==================== SUBTASK QUERIES ====================
+export async function getSubtasksByTaskId(taskId: number): Promise<Subtask[]> {
+  return await sql<Subtask[]>`
+    SELECT * FROM subtasks 
+    WHERE task_id = ${taskId} 
+    ORDER BY position ASC
+  `;
+}
+
+export async function createSubtask(data: {
+  task_id: number;
+  title: string;
+  position: number;
+}): Promise<Subtask> {
+  const subtasks = await sql<Subtask[]>`
+    INSERT INTO subtasks (task_id, title, position)
+    VALUES (${data.task_id}, ${data.title}, ${data.position})
+    RETURNING *
+  `;
+  return subtasks[0];
+}
+
+export async function updateSubtask(
+  id: number,
+  data: { title?: string; is_completed?: boolean; position?: number }
+): Promise<Subtask | null> {
+  const setClauses: any[] = [];
+  
+  if (data.title !== undefined) setClauses.push(sql`title = ${data.title}`);
+  if (data.is_completed !== undefined) setClauses.push(sql`is_completed = ${data.is_completed}`);
+  if (data.position !== undefined) setClauses.push(sql`position = ${data.position}`);
+
+  setClauses.push(sql`updated_at = CURRENT_TIMESTAMP`);
+
+  if (setClauses.length === 0) return null;
+
+  const subtasks = await sql<Subtask[]>`
+    UPDATE subtasks 
+    SET ${sql.join(setClauses, sql`, `)}
+    WHERE id = ${id}
+    RETURNING *
+  `;
+  return subtasks[0] || null;
+}
+
+export async function deleteSubtask(id: number): Promise<boolean> {
+  const result = await sql`
+    DELETE FROM subtasks WHERE id = ${id}
+  `;
+  return result.count > 0;
 }

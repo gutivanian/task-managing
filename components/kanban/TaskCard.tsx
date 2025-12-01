@@ -1,7 +1,7 @@
 'use client';
 
 import { TaskWithTags } from '@/types';
-import { Calendar, Clock, Zap, Tag as TagIcon } from 'lucide-react';
+import { Calendar, Clock, Zap, Tag as TagIcon, CheckSquare } from 'lucide-react';
 import { format } from 'date-fns';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -13,10 +13,10 @@ interface TaskCardProps {
 }
 
 const priorityColors = {
-  low: 'bg-gray-100 text-gray-700 border-gray-300',
-  medium: 'bg-blue-100 text-blue-700 border-blue-300',
-  high: 'bg-orange-100 text-orange-700 border-orange-300',
-  urgent: 'bg-red-100 text-red-700 border-red-300',
+  low: 'bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600',
+  medium: 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-700',
+  high: 'bg-orange-100 text-orange-700 border-orange-300 dark:bg-orange-900 dark:text-orange-300 dark:border-orange-700',
+  urgent: 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900 dark:text-red-300 dark:border-red-700',
 };
 
 const energyIcons = {
@@ -41,6 +41,9 @@ export default function TaskCard({ task, onClick, isTimerActive }: TaskCardProps
     opacity: isDragging ? 0.5 : 1,
   };
 
+  const completedSubtasks = task.subtasks?.filter(s => s.is_completed).length || 0;
+  const totalSubtasks = task.subtasks?.length || 0;
+
   return (
     <div
       ref={setNodeRef}
@@ -48,12 +51,12 @@ export default function TaskCard({ task, onClick, isTimerActive }: TaskCardProps
       {...attributes}
       {...listeners}
       onClick={onClick}
-      className={`bg-white rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer border ${
-        isTimerActive ? 'ring-2 ring-blue-500 border-blue-500' : 'border-gray-200'
+      className={`bg-white dark:bg-gray-800 rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer border ${
+        isTimerActive ? 'ring-2 ring-blue-500 border-blue-500' : 'border-gray-200 dark:border-gray-700'
       }`}
     >
       <div className="flex items-start justify-between gap-2 mb-2">
-        <h4 className="text-sm font-medium text-gray-900 flex-1 line-clamp-2">
+        <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 flex-1 line-clamp-2">
           {task.title}
         </h4>
         <span
@@ -66,12 +69,12 @@ export default function TaskCard({ task, onClick, isTimerActive }: TaskCardProps
       </div>
 
       {task.description && (
-        <p className="text-xs text-gray-600 line-clamp-2 mb-2">
+        <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2 mb-2">
           {task.description}
         </p>
       )}
 
-      <div className="flex flex-wrap gap-2 items-center text-xs text-gray-500">
+      <div className="flex flex-wrap gap-2 items-center text-xs text-gray-500 dark:text-gray-400">
         {task.due_date && (
           <div className="flex items-center gap-1">
             <Calendar className="w-3 h-3" />
@@ -89,6 +92,13 @@ export default function TaskCard({ task, onClick, isTimerActive }: TaskCardProps
         {task.energy_level && (
           <div className="flex items-center gap-1">
             <span>{energyIcons[task.energy_level]}</span>
+          </div>
+        )}
+
+        {totalSubtasks > 0 && (
+          <div className="flex items-center gap-1">
+            <CheckSquare className="w-3 h-3" />
+            <span>{completedSubtasks}/{totalSubtasks}</span>
           </div>
         )}
       </div>

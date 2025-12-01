@@ -94,3 +94,17 @@ CREATE INDEX idx_tasks_is_archived ON tasks(is_archived);
 CREATE INDEX idx_tags_user_id ON tags(user_id);
 CREATE INDEX idx_activity_logs_task_id ON activity_logs(task_id);
 CREATE INDEX idx_activity_logs_user_id ON activity_logs(user_id);
+
+-- Tambahkan tabel subtasks
+CREATE TABLE IF NOT EXISTS subtasks (
+  id SERIAL PRIMARY KEY,
+  task_id INTEGER REFERENCES tasks(id) ON DELETE CASCADE,
+  title VARCHAR(255) NOT NULL,
+  is_completed BOOLEAN DEFAULT FALSE,
+  position INTEGER NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create index untuk better performance
+CREATE INDEX idx_subtasks_task_id ON subtasks(task_id);
