@@ -139,7 +139,7 @@ export async function updateColumn(
   id: number,
   data: { title?: string; position?: number; color?: string; task_limit?: number | null; column_type?: string }
 ): Promise<Column | null> {
-  const setClauses: string[] = [];
+  const setClauses: any[]= [];
   
   if (data.title !== undefined) setClauses.push(sql`title = ${data.title}`);
   if (data.position !== undefined) setClauses.push(sql`position = ${data.position}`);
