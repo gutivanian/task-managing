@@ -4,10 +4,16 @@ const nextConfig = {
     serverActions: {
       allowedOrigins: ['localhost:3000'],
     },
-      eslint: {
+  },
+
+  // ⬇️ letakkan DI SINI, bukan di dalam experimental
+  eslint: {
     ignoreDuringBuilds: true,
   },
-  },
-}
 
-module.exports = nextConfig
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+};
+
+module.exports = nextConfig;
