@@ -1,3 +1,4 @@
+// components/tasks/TaskDetail.tsx
 'use client';
 
 import { TaskWithTags, Subtask } from '@/types';
@@ -12,6 +13,7 @@ interface TaskDetailProps {
   onEdit: () => void;
   onDelete: () => void;
   onUpdateTimeSpent: (taskId: number, timeSpent: number) => void;
+  onSubtaskChange: () => Promise<void>; // Add this callback
 }
 
 const priorityColors = {
@@ -32,6 +34,7 @@ export default function TaskDetail({
   onEdit,
   onDelete,
   onUpdateTimeSpent,
+  onSubtaskChange,
 }: TaskDetailProps) {
   const { activeTaskId, seconds, isRunning, startTimer, stopTimer, resetTimer, tick, setSeconds } =
     useTimerStore();
@@ -41,6 +44,11 @@ export default function TaskDetail({
   const [isAddingSubtask, setIsAddingSubtask] = useState(false);
 
   const isActive = activeTaskId === task.id;
+
+  // Update subtasks when task prop changes
+  useEffect(() => {
+    setSubtasks(task.subtasks || []);
+  }, [task.subtasks]);
 
   useEffect(() => {
     if (isActive) {
@@ -89,6 +97,11 @@ export default function TaskDetail({
     const subtask = subtasks.find(s => s.id === subtaskId);
     if (!subtask) return;
 
+    // Optimistic update
+    setSubtasks(subtasks.map(s => 
+      s.id === subtaskId ? { ...s, is_completed: !s.is_completed } : s
+    ));
+
     try {
       const response = await fetch(`/api/subtasks/${subtaskId}`, {
         method: 'PATCH',
@@ -97,12 +110,16 @@ export default function TaskDetail({
       });
 
       if (response.ok) {
-        setSubtasks(subtasks.map(s => 
-          s.id === subtaskId ? { ...s, is_completed: !s.is_completed } : s
-        ));
+        // Refresh parent data to update everything
+        await onSubtaskChange();
+      } else {
+        // Revert on error
+        setSubtasks(subtasks);
       }
     } catch (error) {
       console.error('Failed to toggle subtask:', error);
+      // Revert on error
+      setSubtasks(subtasks);
     }
   };
 
@@ -125,6 +142,8 @@ export default function TaskDetail({
         setSubtasks([...subtasks, newSubtask]);
         setNewSubtaskTitle('');
         setIsAddingSubtask(false);
+        // Refresh parent data
+        await onSubtaskChange();
       }
     } catch (error) {
       console.error('Failed to add subtask:', error);
@@ -132,16 +151,26 @@ export default function TaskDetail({
   };
 
   const handleDeleteSubtask = async (subtaskId: number) => {
+    // Optimistic update
+    const originalSubtasks = [...subtasks];
+    setSubtasks(subtasks.filter(s => s.id !== subtaskId));
+
     try {
       const response = await fetch(`/api/subtasks/${subtaskId}`, {
         method: 'DELETE',
       });
 
       if (response.ok) {
-        setSubtasks(subtasks.filter(s => s.id !== subtaskId));
+        // Refresh parent data
+        await onSubtaskChange();
+      } else {
+        // Revert on error
+        setSubtasks(originalSubtasks);
       }
     } catch (error) {
       console.error('Failed to delete subtask:', error);
+      // Revert on error
+      setSubtasks(originalSubtasks);
     }
   };
 

@@ -1,3 +1,4 @@
+// components/kanban/KanbanColumn.tsx
 'use client';
 
 import { ColumnWithTasks } from '@/types';
@@ -11,6 +12,7 @@ interface KanbanColumnProps {
   onAddTask: (columnId: number) => void;
   onTaskClick: (taskId: number) => void;
   activeTimerTaskId: number | null;
+  movingTaskId?: number | null;
 }
 
 export default function KanbanColumn({
@@ -18,6 +20,7 @@ export default function KanbanColumn({
   onAddTask,
   onTaskClick,
   activeTimerTaskId,
+  movingTaskId,
 }: KanbanColumnProps) {
   const { setNodeRef } = useDroppable({
     id: column.id,
@@ -59,6 +62,7 @@ export default function KanbanColumn({
               task={task}
               onClick={() => onTaskClick(task.id)}
               isTimerActive={activeTimerTaskId === task.id}
+              isMoving={movingTaskId === task.id}
             />
           ))}
         </SortableContext>

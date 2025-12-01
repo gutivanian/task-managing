@@ -1,3 +1,4 @@
+// lib\db\queries.ts
 import sql from './index';
 import {
   User,
@@ -140,24 +141,46 @@ export async function updateColumn(
   id: number,
   data: { title?: string; position?: number; color?: string; task_limit?: number | null; column_type?: string }
 ): Promise<Column | null> {
-  const setClauses: any[]= [];
-  
-  if (data.title !== undefined) setClauses.push(sql`title = ${data.title}`);
-  if (data.position !== undefined) setClauses.push(sql`position = ${data.position}`);
-  if (data.color !== undefined) setClauses.push(sql`color = ${data.color}`);
-  if (data.task_limit !== undefined) setClauses.push(sql`task_limit = ${data.task_limit}`);
-  if (data.column_type !== undefined) setClauses.push(sql`column_type = ${data.column_type}`);
+  const updates: string[] = [];
+  const values: any[] = [];
+  let paramCount = 1;
 
-  if (setClauses.length === 0) return null;
+  if (data.title !== undefined) {
+    updates.push(`title = $${paramCount++}`);
+    values.push(data.title);
+  }
+  if (data.position !== undefined) {
+    updates.push(`position = $${paramCount++}`);
+    values.push(data.position);
+  }
+  if (data.color !== undefined) {
+    updates.push(`color = $${paramCount++}`);
+    values.push(data.color);
+  }
+  if (data.task_limit !== undefined) {
+    updates.push(`task_limit = $${paramCount++}`);
+    values.push(data.task_limit);
+  }
+  if (data.column_type !== undefined) {
+    updates.push(`column_type = $${paramCount++}`);
+    values.push(data.column_type);
+  }
 
-  const columns = await sql<Column[]>`
+  if (updates.length === 0) return null;
+
+  values.push(id); // Add id as last parameter
+
+  const query = `
     UPDATE columns 
-    SET ${sql.join(setClauses, sql`, `)}
-    WHERE id = ${id}
+    SET ${updates.join(', ')}
+    WHERE id = $${paramCount}
     RETURNING *
   `;
+
+  const columns = await sql.unsafe<Column[]>(query, values);
   return columns[0] || null;
 }
+
 
 export async function deleteColumn(id: number): Promise<boolean> {
   const result = await sql`
@@ -231,29 +254,64 @@ export async function updateTask(
     completed_at?: Date | null;
   }
 ): Promise<Task | null> {
-  const setClauses: any[] = [];
-  
-  if (data.title !== undefined) setClauses.push(sql`title = ${data.title}`);
-  if (data.description !== undefined) setClauses.push(sql`description = ${data.description}`);
-  if (data.priority !== undefined) setClauses.push(sql`priority = ${data.priority}`);
-  if (data.due_date !== undefined) setClauses.push(sql`due_date = ${data.due_date}`);
-  if (data.energy_level !== undefined) setClauses.push(sql`energy_level = ${data.energy_level}`);
-  if (data.column_id !== undefined) setClauses.push(sql`column_id = ${data.column_id}`);
-  if (data.position !== undefined) setClauses.push(sql`position = ${data.position}`);
-  if (data.time_spent !== undefined) setClauses.push(sql`time_spent = ${data.time_spent}`);
-  if (data.is_archived !== undefined) setClauses.push(sql`is_archived = ${data.is_archived}`);
-  if (data.completed_at !== undefined) setClauses.push(sql`completed_at = ${data.completed_at}`);
+  const updates: string[] = [];
+  const values: any[] = [];
+  let paramCount = 1;
 
-  setClauses.push(sql`updated_at = CURRENT_TIMESTAMP`);
+  if (data.title !== undefined) {
+    updates.push(`title = $${paramCount++}`);
+    values.push(data.title);
+  }
+  if (data.description !== undefined) {
+    updates.push(`description = $${paramCount++}`);
+    values.push(data.description);
+  }
+  if (data.priority !== undefined) {
+    updates.push(`priority = $${paramCount++}`);
+    values.push(data.priority);
+  }
+  if (data.due_date !== undefined) {
+    updates.push(`due_date = $${paramCount++}`);
+    values.push(data.due_date);
+  }
+  if (data.energy_level !== undefined) {
+    updates.push(`energy_level = $${paramCount++}`);
+    values.push(data.energy_level);
+  }
+  if (data.column_id !== undefined) {
+    updates.push(`column_id = $${paramCount++}`);
+    values.push(data.column_id);
+  }
+  if (data.position !== undefined) {
+    updates.push(`position = $${paramCount++}`);
+    values.push(data.position);
+  }
+  if (data.time_spent !== undefined) {
+    updates.push(`time_spent = $${paramCount++}`);
+    values.push(data.time_spent);
+  }
+  if (data.is_archived !== undefined) {
+    updates.push(`is_archived = $${paramCount++}`);
+    values.push(data.is_archived);
+  }
+  if (data.completed_at !== undefined) {
+    updates.push(`completed_at = $${paramCount++}`);
+    values.push(data.completed_at);
+  }
 
-  if (setClauses.length === 0) return null;
+  if (updates.length === 0) return null;
 
-  const tasks = await sql<Task[]>`
+  updates.push('updated_at = CURRENT_TIMESTAMP');
+  values.push(id); // Add id as last parameter
+
+  const query = `
     UPDATE tasks 
-    SET ${sql.join(setClauses, sql`, `)}
-    WHERE id = ${id}
+    SET ${updates.join(', ')}
+    WHERE id = $${paramCount}
     RETURNING *
   `;
+
+  const tasks = await sql.unsafe<Task[]>(query, values);
   return tasks[0] || null;
 }
 
@@ -361,7 +419,16 @@ export async function getTasksWithTags(projectId: number): Promise<TaskWithTags[
   const tasksWithTags: TaskWithTags[] = await Promise.all(
     tasks.map(async (task) => {
       const tags = await getTagsByTaskId(task.id);
-      const subtasks = await getSubtasksByTaskId(task.id);
+      // Try to get subtasks, but return empty array if table doesn't exist yet
+      let subtasks: Subtask[] = [];
+      try {
+        subtasks = await getSubtasksByTaskId(task.id);
+      } catch (error: any) {
+        // Subtasks table might not exist yet, that's okay
+        if (error.code !== '42P01') {
+          console.error('Error fetching subtasks:', error);
+        }
+      }
       return { ...task, tags, subtasks };
     })
   );
@@ -381,11 +448,20 @@ export async function getColumnsWithTasks(projectId: number): Promise<ColumnWith
 
 // ==================== SUBTASK QUERIES ====================
 export async function getSubtasksByTaskId(taskId: number): Promise<Subtask[]> {
-  return await sql<Subtask[]>`
-    SELECT * FROM subtasks 
-    WHERE task_id = ${taskId} 
-    ORDER BY position ASC
-  `;
+  try {
+    return await sql<Subtask[]>`
+      SELECT * FROM subtasks 
+      WHERE task_id = ${taskId} 
+      ORDER BY position ASC
+    `;
+  } catch (error: any) {
+    // If table doesn't exist yet, return empty array
+    if (error.code === '42P01') {
+      console.warn('Subtasks table not found. Run migration to enable subtasks feature.');
+      return [];
+    }
+    throw error;
+  }
 }
 
 export async function createSubtask(data: {
@@ -405,25 +481,44 @@ export async function updateSubtask(
   id: number,
   data: { title?: string; is_completed?: boolean; position?: number }
 ): Promise<Subtask | null> {
-  const setClauses: any[] = [];
-  
-  if (data.title !== undefined) setClauses.push(sql`title = ${data.title}`);
-  if (data.is_completed !== undefined) setClauses.push(sql`is_completed = ${data.is_completed}`);
-  if (data.position !== undefined) setClauses.push(sql`position = ${data.position}`);
+  const updates: string[] = [];
+  const values: any[] = [];
+  let paramCount = 1;
 
-  setClauses.push(sql`updated_at = CURRENT_TIMESTAMP`);
+  if (data.title !== undefined) {
+    updates.push(`title = $${paramCount++}`);
+    values.push(data.title);
+  }
+  if (data.is_completed !== undefined) {
+    updates.push(`is_completed = $${paramCount++}`);
+    values.push(data.is_completed);
+  }
+  if (data.position !== undefined) {
+    updates.push(`position = $${paramCount++}`);
+    values.push(data.position);
+  }
 
-  if (setClauses.length === 0) return null;
+  if (updates.length === 0) {
+    // No updates, fetch current subtask
+    const subtasks = await sql<Subtask[]>`
+      SELECT * FROM subtasks WHERE id = ${id} LIMIT 1
+    `;
+    return subtasks[0] || null;
+  }
 
-  const subtasks = await sql<Subtask[]>`
+  updates.push('updated_at = CURRENT_TIMESTAMP');
+  values.push(id); // Add id as last parameter
+
+  const query = `
     UPDATE subtasks 
-    SET ${sql.join(setClauses, sql`, `)}
-    WHERE id = ${id}
+    SET ${updates.join(', ')}
+    WHERE id = $${paramCount}
     RETURNING *
   `;
+
+  const subtasks = await sql.unsafe<Subtask[]>(query, values);
   return subtasks[0] || null;
 }
-
 export async function deleteSubtask(id: number): Promise<boolean> {
   const result = await sql`
     DELETE FROM subtasks WHERE id = ${id}

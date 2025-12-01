@@ -1,3 +1,4 @@
+// components/kanban/KanbanBoard.tsx
 'use client';
 
 import { ColumnWithTasks } from '@/types';
@@ -12,6 +13,7 @@ interface KanbanBoardProps {
   onAddTask: (columnId: number) => void;
   onTaskClick: (taskId: number) => void;
   activeTimerTaskId: number | null;
+  movingTaskId?: number | null;
 }
 
 export default function KanbanBoard({
@@ -20,6 +22,7 @@ export default function KanbanBoard({
   onAddTask,
   onTaskClick,
   activeTimerTaskId,
+  movingTaskId,
 }: KanbanBoardProps) {
   const [activeId, setActiveId] = useState<number | null>(null);
 
@@ -86,6 +89,7 @@ export default function KanbanBoard({
             onAddTask={onAddTask}
             onTaskClick={onTaskClick}
             activeTimerTaskId={activeTimerTaskId}
+            movingTaskId={movingTaskId}
           />
         ))}
       </div>
@@ -93,7 +97,11 @@ export default function KanbanBoard({
       <DragOverlay>
         {activeTask && (
           <div className="rotate-3">
-            <TaskCard task={activeTask} onClick={() => {}} />
+            <TaskCard 
+              task={activeTask} 
+              onClick={() => {}}
+              isTimerActive={activeTimerTaskId === activeTask.id}
+            />
           </div>
         )}
       </DragOverlay>

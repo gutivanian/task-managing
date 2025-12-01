@@ -1,3 +1,4 @@
+// app/(dashboard)/projects/[id]/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -25,6 +26,7 @@ export default function ProjectDetailPage() {
   const { activeTaskId } = useTimerStore();
 
   const [loading, setLoading] = useState(true);
+  const [movingTaskId, setMovingTaskId] = useState<number | null>(null);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedColumnId, setSelectedColumnId] = useState<number | null>(null);
@@ -40,6 +42,8 @@ export default function ProjectDetailPage() {
       const response = await fetch(`/api/projects/${projectId}`);
       if (response.ok) {
         const data = await response.json();
+        console.log('Fetched project data:', data);
+        console.log('Columns with tasks:', data.columns);
         setCurrentProject(data.project);
         setColumns(data.columns);
       } else {
@@ -144,19 +148,33 @@ export default function ProjectDetailPage() {
     columnId: number,
     position: number
   ) => {
+    // Set loading state for the specific task being moved
+    setMovingTaskId(taskId);
+
     // Optimistic update
     moveTask(taskId, columnId, position);
 
     try {
-      await fetch(`/api/tasks/${taskId}/move`, {
+      const response = await fetch(`/api/tasks/${taskId}/move`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ column_id: columnId, position }),
       });
+
+      if (response.ok) {
+        // Refresh project data to get the latest state from server
+        await fetchProjectData();
+      } else {
+        // If move failed, revert by refreshing data
+        await fetchProjectData();
+      }
     } catch (error) {
       console.error('Error moving task:', error);
-      // Optionally: revert optimistic update
-      fetchProjectData();
+      // Revert optimistic update on error
+      await fetchProjectData();
+    } finally {
+      // Clear loading state
+      setMovingTaskId(null);
     }
   };
 
@@ -229,6 +247,7 @@ export default function ProjectDetailPage() {
         onAddTask={handleAddTask}
         onTaskClick={handleTaskClick}
         activeTimerTaskId={activeTaskId}
+        movingTaskId={movingTaskId}
       />
 
       <Modal
@@ -269,6 +288,7 @@ export default function ProjectDetailPage() {
             onEdit={handleEditTask}
             onDelete={handleDeleteTask}
             onUpdateTimeSpent={handleUpdateTimeSpent}
+            onSubtaskChange={fetchProjectData}
           />
         )}
       </Modal>
