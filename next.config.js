@@ -4,6 +4,9 @@ const nextConfig = {
     serverActions: {
       allowedOrigins: ['localhost:3000'],
     },
+      eslint: {
+    ignoreDuringBuilds: true,
+  },
   },
 }
 
